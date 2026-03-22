@@ -575,8 +575,8 @@
         <input type="text" id="userName" placeholder="請輸入姓名">
       </div>
       <div class="form-row">
-        <label>部門／班級 *</label>
-        <input type="text" id="userDept" placeholder="例：資管系三年級">
+        <label>部門／班級</label>
+        <input type="text" id="userDept" placeholder="選填，例：資管系三年級">
       </div>
       <div class="form-row">
         <label>聯絡電話</label>
@@ -616,8 +616,8 @@
         <input type="text" id="m_userName" placeholder="請輸入姓名">
       </div>
       <div class="form-row">
-        <label>部門／班級 *</label>
-        <input type="text" id="m_userDept" placeholder="例：資管系三年級">
+        <label>部門／班級</label>
+        <input type="text" id="m_userDept" placeholder="選填，例：資管系三年級">
       </div>
       <div class="form-row">
         <label>聯絡電話</label>
@@ -656,7 +656,7 @@
 // ═══════════════════════════════════════════════════════
 //  GOOGLE APPS SCRIPT URL（部署後請更新此處）
 // ═══════════════════════════════════════════════════════
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbxnA7gtv_rsqaTLqxnnFWuA4z-tHt-C7yWVk_UCfTwiQ-6FlwHk1cuhALycXMy5__JB/exec';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbx5AuUZuRIgZSOJDpWOa3le2hzJcKNyU7GjF9xwX3tS4Pb24KzQKQPHqih6iaLUqd6-/exec';
 
 // ═══════════════════════════════════════════════════════
 //  MENU DATA
@@ -1138,7 +1138,7 @@ function openConfirm() {
   // sync info
   const name = document.getElementById('userName').value.trim() || document.getElementById('m_userName').value.trim();
   const dept = document.getElementById('userDept').value.trim() || document.getElementById('m_userDept').value.trim();
-  if (!name || !dept) { alert('請填寫姓名與部門/班級'); return; }
+  if (!name) { alert('請填寫姓名'); return; }
   if (cart.length === 0) { alert('請至少加入一項餐點'); return; }
 
   const total = cart.reduce((s,c) => s + c.price * c.qty, 0);
@@ -1179,60 +1179,48 @@ function submitOrder() {
   closeConfirm();
   closeMobileCart();
 
-  const name = document.getElementById('userName').value.trim() || document.getElementById('m_userName').value.trim();
-  const dept = document.getElementById('userDept').value.trim() || document.getElementById('m_userDept').value.trim();
+  const name  = document.getElementById('userName').value.trim()  || document.getElementById('m_userName').value.trim();
+  const dept  = document.getElementById('userDept').value.trim()  || document.getElementById('m_userDept').value.trim();
   const phone = document.getElementById('userPhone').value.trim() || document.getElementById('m_userPhone').value.trim();
-  const note = document.getElementById('userNote').value.trim() || document.getElementById('m_userNote').value.trim();
+  const note  = document.getElementById('userNote').value.trim()  || document.getElementById('m_userNote').value.trim();
   const total = cart.reduce((s,c) => s + c.price * c.qty, 0);
-  const ts = new Date().toLocaleString('zh-TW', { timeZone:'Asia/Taipei' });
+  const ts    = new Date().toLocaleString('zh-TW', { timeZone:'Asia/Taipei' });
 
-  const payload = {
-    timestamp: ts,
-    userName: name,
-    userDept: dept,
-    userPhone: phone,
-    userNote: note,
-    orderTotal: total,
-    notifyEmails: 'x00001548@meiho.edu.tw,wumas67@gmail.com',
-    itemsJson: JSON.stringify(cart.map(c => ({
-      storeName: c.storeName,
-      dishName: c.name,
-      options: c.options,
-      quantity: c.qty,
-      unitPrice: c.price,
-      subtotal: c.price * c.qty
-    })))
-  };
+  const itemsJson = JSON.stringify(cart.map(c => ({
+    storeName: c.storeName,
+    dishName:  c.name,
+    options:   c.options,
+    quantity:  c.qty,
+    unitPrice: c.price,
+    subtotal:  c.price * c.qty
+  })));
 
-  // send via hidden form + iframe
-  const iframe = document.createElement('iframe');
-  iframe.name = 'submit_frame';
-  iframe.style.display = 'none';
-  document.body.appendChild(iframe);
+  // ★ 重點：用 URLSearchParams 送出 application/x-www-form-urlencoded
+  //   GAS 的 e.parameter 只能讀這種格式，FormData(multipart) 會讓 e.parameter 是空的
+  const params = new URLSearchParams();
+  params.append('timestamp',    ts);
+  params.append('userName',     name);
+  params.append('userDept',     dept);
+  params.append('userPhone',    phone || '');
+  params.append('userNote',     note  || '');
+  params.append('orderTotal',   String(total));
+  params.append('notifyEmails', 'x00001548@meiho.edu.tw,wumas67@gmail.com');
+  params.append('itemsJson',    itemsJson);
 
-  const form = document.createElement('form');
-  form.method = 'POST';
-  form.action = GAS_URL;
-  form.target = 'submit_frame';
-  form.style.display = 'none';
+  fetch(GAS_URL, {
+    method:  'POST',
+    mode:    'no-cors',          // GAS 不回 CORS header，必須 no-cors
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body:    params.toString()   // ← 純字串，GAS 能正確解析成 e.parameter
+  }).catch(err => console.log('[送出] 網路錯誤（可忽略）:', err));
 
-  for (const [k,v] of Object.entries(payload)) {
-    const inp = document.createElement('input');
-    inp.type = 'hidden'; inp.name = k; inp.value = v;
-    form.appendChild(inp);
-  }
-  document.body.appendChild(form);
-  form.submit();
-
-  // reset
-  setTimeout(() => {
-    cart = [];
-    renderCart();
-    ['userName','userDept','userPhone','userNote','m_userName','m_userDept','m_userPhone','m_userNote']
-      .forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
-    showSuccess();
-    form.remove(); iframe.remove();
-  }, 600);
+  // reset UI（no-cors 無法等 response，視為已送出）
+  cart = [];
+  renderCart();
+  ['userName','userDept','userPhone','userNote',
+   'm_userName','m_userDept','m_userPhone','m_userNote']
+    .forEach(id => { const el = document.getElementById(id); if(el) el.value=''; });
+  showSuccess();
 }
 
 function showSuccess() {

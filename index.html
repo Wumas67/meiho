@@ -1204,7 +1204,7 @@ function submitOrder() {
   params.append('userPhone',    phone || '');
   params.append('userNote',     note  || '');
   params.append('orderTotal',   String(total));
-  params.append('notifyEmails', 'x00001548@meiho.edu.tw,wumas67@gmail.com');
+  // notifyEmails 由 GAS 的 CONFIG.NOTIFY_EMAILS 統一管理，前端不傳
   params.append('itemsJson',    itemsJson);
 
   fetch(GAS_URL, {
